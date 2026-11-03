@@ -27,6 +27,8 @@ die() { log "ERROR: $*"; exit 1; }
 BACKUP_TMP=""
 # 1 while Nextcloud is in maintenance mode because of this script.
 NEXTCLOUD_MAINTENANCE=0
+# 1 while Vaultwarden is stopped because of this script.
+VAULTWARDEN_STOPPED=0
 
 on_exit() {
     local rc=$?
@@ -39,6 +41,14 @@ on_exit() {
             log "Nextcloud maintenance mode turned off"
         else
             log "WARNING: could not turn off maintenance mode, run: occ maintenance:mode --off"
+        fi
+    fi
+    # Same for Vaultwarden, it must not stay stopped.
+    if [[ $VAULTWARDEN_STOPPED -eq 1 ]]; then
+        if dc vaultwarden start vaultwarden >/dev/null 2>&1; then
+            log "Vaultwarden started again"
+        else
+            log "WARNING: Vaultwarden is stopped, run: docker compose -f vaultwarden/docker-compose.yml up -d"
         fi
     fi
 }
@@ -160,8 +170,16 @@ backup_synapse() {
 
 backup_vaultwarden() {
     local d="$1"
+    require_running vaultwarden vaultwarden
+    # Copying a SQLite database while it is being written can give a corrupt
+    # copy, so Vaultwarden is stopped for the few seconds the archive takes.
+    log "Stopping Vaultwarden for a consistent copy"
+    VAULTWARDEN_STOPPED=1
+    dc vaultwarden stop vaultwarden >/dev/null
     log "Backing up Vaultwarden"
     tar_dir vaultwarden bitwarden "$d/vaultwarden_data.tar.gz"
+    dc vaultwarden start vaultwarden >/dev/null
+    VAULTWARDEN_STOPPED=0
 }
 
 restore_nginx() {
