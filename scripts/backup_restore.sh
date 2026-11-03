@@ -13,8 +13,10 @@ umask 077
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKUP_DIR="${BACKUP_DIR:-$ROOT/backup}"
 LOG_DIR="${LOG_DIR:-$ROOT/logs}"
-TIMESTAMP="$(date +%Y%m%d%H%M)"
-mkdir -p "$LOG_DIR"
+TIMESTAMP="$(date +%Y%m%d%H%M%S)"
+mkdir -p "$BACKUP_DIR" "$LOG_DIR"
+# Docker bind mounts need absolute paths, so resolve a relative BACKUP_DIR.
+BACKUP_DIR="$(cd "$BACKUP_DIR" && pwd)"
 LOG_FILE="$LOG_DIR/backup_restore_$TIMESTAMP.log"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $*" | tee -a "$LOG_FILE"; }
