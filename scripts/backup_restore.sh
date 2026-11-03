@@ -39,12 +39,30 @@ dc() {
 tar_dir() {
     docker run --rm -v "$ROOT/$1:/src:ro" -v "$(dirname "$3"):/out" alpine \
         tar czf "/out/$(basename "$3")" -C /src "$2"
+    gzip -t "$3" || die "Archive failed its integrity check: $3"
 }
 
 # untar_dir <stack-dir> <archive>
 untar_dir() {
     docker run --rm -v "$ROOT/$1:/dst" -v "$(dirname "$2"):/in:ro" alpine \
         tar xzf "/in/$(basename "$2")" -C /dst
+}
+
+# check_dump <file> <text that ends a complete dump>
+check_dump() {
+    [[ -s "$1" ]] || die "Dump is empty: $1"
+    tail -n 5 "$1" | grep -q "$2" || die "Dump looks truncated (missing '$2'): $1"
+}
+
+# write_checksums <backup-dir>
+write_checksums() {
+    (cd "$1" && sha256sum -- * > SHA256SUMS)
+}
+
+# verify_checksums <backup-dir>
+verify_checksums() {
+    [[ -f "$1/SHA256SUMS" ]] || die "No SHA256SUMS in $1, refusing to restore an unverified backup"
+    (cd "$1" && sha256sum --check --quiet SHA256SUMS) || die "Checksum mismatch in $1, the backup is damaged"
 }
 
 backup_nginx() {
@@ -59,6 +77,7 @@ backup_nextcloud() {
     log "Backing up Nextcloud database"
     dc nextcloud-onlyoffice exec -T nextcloud_db \
         sh -c 'exec mariadb-dump --all-databases -uroot -p"$MYSQL_ROOT_PASSWORD"' > "$d/nextcloud_db.sql"
+    check_dump "$d/nextcloud_db.sql" "Dump completed"
     log "Backing up Nextcloud files"
     tar_dir nextcloud-onlyoffice nextcloud_data "$d/nextcloud_data.tar.gz"
 }
@@ -68,6 +87,7 @@ backup_onlyoffice() {
     log "Backing up OnlyOffice database"
     dc nextcloud-onlyoffice exec -T onlyoffice_db \
         sh -c 'exec pg_dumpall -U "$POSTGRES_USER"' > "$d/onlyoffice_db.sql"
+    check_dump "$d/onlyoffice_db.sql" "PostgreSQL database cluster dump complete"
 }
 
 backup_synapse() {
@@ -75,6 +95,7 @@ backup_synapse() {
     log "Backing up Synapse database"
     dc synapse exec -T synapse_db \
         sh -c 'exec pg_dumpall -U "$POSTGRES_USER"' > "$d/synapse_db.sql"
+    check_dump "$d/synapse_db.sql" "PostgreSQL database cluster dump complete"
     log "Backing up Synapse config, media and signing key"
     tar_dir synapse data "$d/synapse_data.tar.gz"
 }
@@ -158,6 +179,7 @@ case "${1:-}" in
         BACKUP_TMP="$dir.partial"
         mkdir -p "$BACKUP_TMP"
         run backup "$BACKUP_TMP" "${2:-all}"
+        write_checksums "$BACKUP_TMP"
         mv "$BACKUP_TMP" "$dir"
         BACKUP_TMP=""
         log "Backup written to $dir"
@@ -167,6 +189,7 @@ case "${1:-}" in
         [[ "$2" =~ ^[0-9]+$ ]] || die "Backup name must be a timestamp such as 20261103120000, got '$2'"
         dir="$BACKUP_DIR/$2"
         [[ -d "$dir" ]] || die "No such backup: $dir"
+        verify_checksums "$dir"
         run restore "$dir" "${3:-all}"
         log "Restore from $dir finished"
         ;;
