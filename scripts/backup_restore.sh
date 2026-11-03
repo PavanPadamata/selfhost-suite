@@ -254,6 +254,20 @@ restore_vaultwarden() {
     dc vaultwarden up -d
 }
 
+# prune_backups  keeps the newest $KEEP_BACKUPS backups (0 or unset keeps everything)
+prune_backups() {
+    local keep="${KEEP_BACKUPS:-0}" dirs=() d i
+    [[ "$keep" =~ ^[0-9]+$ ]] || die "KEEP_BACKUPS must be a number, got '$keep'"
+    [[ "$keep" -gt 0 ]] || return 0
+    for d in "$BACKUP_DIR"/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]; do
+        [[ -d "$d" ]] && dirs+=("$d")
+    done
+    for ((i = 0; i < ${#dirs[@]} - keep; i++)); do
+        log "Removing old backup ${dirs[$i]}"
+        rm -rf -- "${dirs[$i]}"
+    done
+}
+
 SERVICES=(nginx nextcloud onlyoffice synapse vaultwarden)
 
 run() {
@@ -280,6 +294,7 @@ case "${1:-}" in
         mv "$BACKUP_TMP" "$dir"
         BACKUP_TMP=""
         log "Backup written to $dir"
+        prune_backups
         ;;
     restore)
         [[ -n "${2:-}" ]] || die "Provide the backup timestamp (a folder name under $BACKUP_DIR)"
