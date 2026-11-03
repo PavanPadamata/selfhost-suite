@@ -1,0 +1,63 @@
+# Settings to merge into the homeserver.yaml that Synapse generates on first run
+# (see the README). Secrets are generated for you, keep those and change the rest.
+server_name: "matrix.example.com"
+pid_file: /data/homeserver.pid
+
+listeners:
+  # Bind to IPv4 explicitly, the host has no IPv6.
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ['0.0.0.0']
+    resources:
+      - names: [client, federation]
+        compress: false
+
+  # Federation endpoint, published through Nginx Proxy Manager on :8448.
+  - port: 8448
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ['0.0.0.0']
+    resources:
+      - names: [client, federation]
+
+database:
+  name: psycopg2
+  args:
+    user: synapse_user
+    password: CHANGE_ME      # same as POSTGRES_PASSWORD in .env
+    database: synapse
+    host: synapse_db
+    cp_min: 5
+    cp_max: 10
+
+log_config: "/data/matrix.example.com.log.config"
+media_store_path: /data/media_store
+signing_key_path: "/data/matrix.example.com.signing.key"
+report_stats: true
+
+# Keep the generated values for these three.
+registration_shared_secret: "CHANGE_ME"
+macaroon_secret_key: "CHANGE_ME"
+form_secret: "CHANGE_ME"
+
+# Open registration, gated by a verified email address instead of a token.
+enable_registration: true
+registration_requires_token: false
+registrations_require_3pid:
+  - email
+
+trusted_key_servers:
+  - server_name: "matrix.org"
+
+email:
+  enable_notifs: true
+  smtp_host: mail.example.com
+  smtp_port: 465
+  smtp_user: noreply@example.com
+  smtp_pass: CHANGE_ME
+  require_transport_security: true
+  notif_from: "Matrix <noreply@example.com>"
+  app_name: "Matrix"
