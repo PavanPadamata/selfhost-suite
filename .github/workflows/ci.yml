@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  compose:
+    name: Validate ${{ matrix.stack }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        stack:
+          - nginx-proxy-manager
+          - nextcloud-onlyoffice
+          - synapse
+          - vaultwarden
+          - penpot
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the compose file renders with the example settings
+        working-directory: ${{ matrix.stack }}
+        run: |
+          if [ -f .env.example ]; then cp .env.example .env; fi
+          docker compose config --quiet
+
+  script:
+    name: Lint backup script
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: bash -n scripts/backup_restore.sh
+      - run: shellcheck scripts/backup_restore.sh
+
+  hygiene:
+    name: Repository checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: No real .env file is committed
+        run: |
+          if git ls-files | grep -E '(^|/)\.env$'; then
+            echo "::error::Commit .env.example, never .env"
+            exit 1
+          fi
+      - name: Config files parse
+        run: |
+          yq '.' synapse/homeserver.yaml.example > /dev/null
+          python3 -m json.tool renovate.json > /dev/null
