@@ -13,6 +13,7 @@ umask 077
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKUP_DIR="${BACKUP_DIR:-$ROOT/backup}"
 LOG_DIR="${LOG_DIR:-$ROOT/logs}"
+ALPINE_IMAGE="${ALPINE_IMAGE:-alpine:3.24}"
 TIMESTAMP="$(date +%Y%m%d%H%M%S)"
 mkdir -p "$BACKUP_DIR" "$LOG_DIR"
 # Docker bind mounts need absolute paths, so resolve a relative BACKUP_DIR.
@@ -52,14 +53,14 @@ require_running() {
 
 # tar_dir <stack-dir> <dir-name> <archive>  (runs in a container so file ownership is preserved)
 tar_dir() {
-    docker run --rm -e OWNER="$(id -u):$(id -g)" -v "$ROOT/$1:/src:ro" -v "$(dirname "$3"):/out" alpine \
+    docker run --rm -e OWNER="$(id -u):$(id -g)" -v "$ROOT/$1:/src:ro" -v "$(dirname "$3"):/out" "$ALPINE_IMAGE" \
         sh -c 'tar czf "/out/$1" -C /src "$2" && chown "$OWNER" "/out/$1"' _ "$(basename "$3")" "$2"
     gzip -t "$3" || die "Archive failed its integrity check: $3"
 }
 
 # untar_dir <stack-dir> <archive>
 untar_dir() {
-    docker run --rm -v "$ROOT/$1:/dst" -v "$(dirname "$2"):/in:ro" alpine \
+    docker run --rm -v "$ROOT/$1:/dst" -v "$(dirname "$2"):/in:ro" "$ALPINE_IMAGE" \
         tar xzf "/in/$(basename "$2")" -C /dst
 }
 
