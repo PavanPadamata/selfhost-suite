@@ -25,11 +25,21 @@ die() { log "ERROR: $*"; exit 1; }
 
 # Set while a backup is being written, so a failure is reported clearly.
 BACKUP_TMP=""
+# 1 while Nextcloud is in maintenance mode because of this script.
+NEXTCLOUD_MAINTENANCE=0
 
 on_exit() {
     local rc=$?
     if [[ $rc -ne 0 && -n "$BACKUP_TMP" ]]; then
         log "ERROR: backup failed (exit $rc), incomplete files left in $BACKUP_TMP"
+    fi
+    # Never leave Nextcloud stuck in maintenance mode when the script stops early.
+    if [[ $NEXTCLOUD_MAINTENANCE -eq 1 ]]; then
+        if occ maintenance:mode --off >/dev/null 2>&1; then
+            log "Nextcloud maintenance mode turned off"
+        else
+            log "WARNING: could not turn off maintenance mode, run: occ maintenance:mode --off"
+        fi
     fi
 }
 trap on_exit EXIT
@@ -49,6 +59,18 @@ preflight() {
 require_running() {
     [[ -n "$(dc "$1" ps --status running --quiet "$2" 2>/dev/null)" ]] \
         || die "Service '$2' is not running in $1, start the stack first"
+}
+
+# occ <args...>  runs Nextcloud's CLI as the web server user
+occ() {
+    dc nextcloud-onlyoffice exec -T -u www-data nextcloud_app php occ "$@"
+}
+
+# nextcloud_maintenance on|off
+nextcloud_maintenance() {
+    if [[ "$1" == on ]]; then NEXTCLOUD_MAINTENANCE=1; fi
+    occ maintenance:mode "--$1" >/dev/null
+    if [[ "$1" == off ]]; then NEXTCLOUD_MAINTENANCE=0; fi
 }
 
 # wait_for <stack-dir> <service> <command run inside the container until it succeeds>
@@ -102,12 +124,18 @@ backup_nginx() {
 backup_nextcloud() {
     local d="$1"
     require_running nextcloud-onlyoffice nextcloud_db
+    require_running nextcloud-onlyoffice nextcloud_app
+    # Keep users from writing while the database and the files are copied,
+    # otherwise the two can end up out of step.
+    log "Turning on Nextcloud maintenance mode"
+    nextcloud_maintenance on
     log "Backing up Nextcloud database"
     dc nextcloud-onlyoffice exec -T nextcloud_db \
         sh -c 'exec mariadb-dump --single-transaction --routines --events --databases "$MYSQL_DATABASE" -uroot -p"$MYSQL_ROOT_PASSWORD"' > "$d/nextcloud_db.sql"
     check_dump "$d/nextcloud_db.sql" "Dump completed"
     log "Backing up Nextcloud files"
     tar_dir nextcloud-onlyoffice nextcloud_data "$d/nextcloud_data.tar.gz"
+    nextcloud_maintenance off
 }
 
 backup_onlyoffice() {
@@ -155,6 +183,17 @@ restore_nextcloud() {
     dc nextcloud-onlyoffice exec -T nextcloud_db \
         sh -c 'exec mariadb -uroot -p"$MYSQL_ROOT_PASSWORD"' < "$d/nextcloud_db.sql"
     dc nextcloud-onlyoffice up -d nextcloud_app
+    log "Waiting for Nextcloud to start"
+    local tries=0
+    until occ status >/dev/null 2>&1; do
+        tries=$((tries + 1))
+        [[ $tries -le 60 ]] || die "Timed out waiting for Nextcloud to start"
+        sleep 2
+    done
+    # The files were copied in maintenance mode, so switch it off again and
+    # let clients know the data came from a backup so they re-sync.
+    occ maintenance:data-fingerprint >/dev/null
+    nextcloud_maintenance off
 }
 
 restore_onlyoffice() {
