@@ -93,7 +93,7 @@ backup_nextcloud() {
     require_running nextcloud-onlyoffice nextcloud_db
     log "Backing up Nextcloud database"
     dc nextcloud-onlyoffice exec -T nextcloud_db \
-        sh -c 'exec mariadb-dump --all-databases -uroot -p"$MYSQL_ROOT_PASSWORD"' > "$d/nextcloud_db.sql"
+        sh -c 'exec mariadb-dump --single-transaction --routines --events --databases "$MYSQL_DATABASE" -uroot -p"$MYSQL_ROOT_PASSWORD"' > "$d/nextcloud_db.sql"
     check_dump "$d/nextcloud_db.sql" "Dump completed"
     log "Backing up Nextcloud files"
     tar_dir nextcloud-onlyoffice nextcloud_data "$d/nextcloud_data.tar.gz"
