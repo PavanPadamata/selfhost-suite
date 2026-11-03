@@ -101,10 +101,12 @@ tar_dir() {
     gzip -t "$3" || die "Archive failed its integrity check: $3"
 }
 
-# untar_dir <stack-dir> <archive>
+# untar_dir <stack-dir> <archive> <dir-name>
+# Replaces <dir-name> with the archive contents, so files that were created
+# after the backup do not survive the restore.
 untar_dir() {
     docker run --rm -v "$ROOT/$1:/dst" -v "$(dirname "$2"):/in:ro" "$ALPINE_IMAGE" \
-        tar xzf "/in/$(basename "$2")" -C /dst
+        sh -c '[ -n "$2" ] && rm -rf "/dst/$2" && tar xzf "/in/$1" -C /dst' _ "$(basename "$2")" "$3"
 }
 
 # check_dump <file> <text that ends a complete dump>
@@ -186,8 +188,8 @@ restore_nginx() {
     local d="$1"
     log "Restoring Nginx Proxy Manager"
     dc nginx-proxy-manager down
-    untar_dir nginx-proxy-manager "$d/nginx_data.tar.gz"
-    untar_dir nginx-proxy-manager "$d/nginx_letsencrypt.tar.gz"
+    untar_dir nginx-proxy-manager "$d/nginx_data.tar.gz" data
+    untar_dir nginx-proxy-manager "$d/nginx_letsencrypt.tar.gz" letsencrypt
     dc nginx-proxy-manager up -d
 }
 
@@ -195,7 +197,7 @@ restore_nextcloud() {
     local d="$1"
     log "Restoring Nextcloud"
     dc nextcloud-onlyoffice stop nextcloud_app
-    untar_dir nextcloud-onlyoffice "$d/nextcloud_data.tar.gz"
+    untar_dir nextcloud-onlyoffice "$d/nextcloud_data.tar.gz" nextcloud_data
     dc nextcloud-onlyoffice up -d nextcloud_db
     wait_for nextcloud-onlyoffice nextcloud_db 'mariadb-admin ping -uroot -p"$MYSQL_ROOT_PASSWORD"'
     dc nextcloud-onlyoffice exec -T nextcloud_db \
@@ -229,7 +231,7 @@ restore_synapse() {
     local d="$1"
     log "Restoring Synapse"
     dc synapse stop synapse
-    untar_dir synapse "$d/synapse_data.tar.gz"
+    untar_dir synapse "$d/synapse_data.tar.gz" data
     dc synapse up -d synapse_db
     wait_for synapse synapse_db 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
     dc synapse exec -T synapse_db \
@@ -241,7 +243,7 @@ restore_vaultwarden() {
     local d="$1"
     log "Restoring Vaultwarden"
     dc vaultwarden down
-    untar_dir vaultwarden "$d/vaultwarden_data.tar.gz"
+    untar_dir vaultwarden "$d/vaultwarden_data.tar.gz" bitwarden
     dc vaultwarden up -d
 }
 
