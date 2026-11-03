@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   proxy:
-    image: jc21/nginx-proxy-manager:latest
+    image: jc21/nginx-proxy-manager:2.16.0
     restart: unless-stopped
     ports:
       - "80:80"     # Public HTTP

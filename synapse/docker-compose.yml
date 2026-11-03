@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   synapse:
-    image: matrixdotorg/synapse:latest
+    image: matrixdotorg/synapse:v1.164.2
     restart: unless-stopped
     ports:
       - "${SYNAPSE_CLIENT_PORT}:8008"
@@ -19,7 +17,7 @@ services:
       - nginx_network
 
   synapse_db:
-    image: postgres:12-alpine
+    image: postgres:17-alpine
     restart: unless-stopped
     volumes:
       - ./synapse_db_data:/var/lib/postgresql/data
