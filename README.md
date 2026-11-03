@@ -97,3 +97,18 @@ Test a restore on a spare host before you rely on it.
 Image versions are pinned in each stack. Major upgrades of Nextcloud, MariaDB and
 PostgreSQL are not interchangeable with older data directories: upgrade one major
 version at a time, and dump and restore the databases for PostgreSQL.
+
+### Automatic update pull requests
+
+[Renovate](https://docs.renovatebot.com/) opens a pull request when a new image
+version is released, and CI (`.github/workflows/ci.yml`) checks every pull request
+renders and lints cleanly. Review, merge, then pull and redeploy the stack.
+
+- One-time setup: install the [Renovate GitHub app](https://github.com/apps/renovate)
+  and allow it on this repository. The first run opens an onboarding-style
+  "Dependency Dashboard" issue that lists everything it is tracking.
+- Versions in a `.env.example` are tracked through the `# renovate:` comment above
+  them, so keep that comment when you edit the line.
+- Major updates of PostgreSQL, MariaDB and Nextcloud are labelled `manual-migration`.
+  Do not merge them blindly: back up first and follow the upstream upgrade notes.
+- Merging only changes the repository. Copy the new tag into your real `.env` too.
