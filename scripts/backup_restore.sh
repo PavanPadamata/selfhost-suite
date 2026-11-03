@@ -18,6 +18,17 @@ LOG_FILE="$LOG_DIR/backup_restore_$TIMESTAMP.log"
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $*" | tee -a "$LOG_FILE"; }
 die() { log "ERROR: $*"; exit 1; }
 
+# Set while a backup is being written, so a failure is reported clearly.
+BACKUP_TMP=""
+
+on_exit() {
+    local rc=$?
+    if [[ $rc -ne 0 && -n "$BACKUP_TMP" ]]; then
+        log "ERROR: backup failed (exit $rc), incomplete files left in $BACKUP_TMP"
+    fi
+}
+trap on_exit EXIT
+
 # dc <stack-dir> <docker compose args...>
 dc() {
     local stack="$1"; shift
@@ -142,12 +153,18 @@ run() {
 case "${1:-}" in
     backup)
         dir="$BACKUP_DIR/$TIMESTAMP"
-        mkdir -p "$dir"
-        run backup "$dir" "${2:-all}"
+        # Write into <timestamp>.partial and only rename once everything succeeded,
+        # so a failed run can never be mistaken for a complete backup.
+        BACKUP_TMP="$dir.partial"
+        mkdir -p "$BACKUP_TMP"
+        run backup "$BACKUP_TMP" "${2:-all}"
+        mv "$BACKUP_TMP" "$dir"
+        BACKUP_TMP=""
         log "Backup written to $dir"
         ;;
     restore)
         [[ -n "${2:-}" ]] || die "Provide the backup timestamp (a folder name under $BACKUP_DIR)"
+        [[ "$2" =~ ^[0-9]+$ ]] || die "Backup name must be a timestamp such as 20261103120000, got '$2'"
         dir="$BACKUP_DIR/$2"
         [[ -d "$dir" ]] || die "No such backup: $dir"
         run restore "$dir" "${3:-all}"
