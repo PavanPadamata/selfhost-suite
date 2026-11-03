@@ -35,6 +35,17 @@ dc() {
     docker compose -f "$ROOT/$stack/docker-compose.yml" --project-directory "$ROOT/$stack" "$@"
 }
 
+preflight() {
+    command -v docker >/dev/null || die "docker is not installed"
+    docker info >/dev/null 2>&1 || die "Cannot talk to the Docker daemon (is it running, and are you in the docker group?)"
+}
+
+# require_running <stack-dir> <service>
+require_running() {
+    [[ -n "$(dc "$1" ps --status running --quiet "$2" 2>/dev/null)" ]] \
+        || die "Service '$2' is not running in $1, start the stack first"
+}
+
 # tar_dir <stack-dir> <dir-name> <archive>  (runs in a container so file ownership is preserved)
 tar_dir() {
     docker run --rm -v "$ROOT/$1:/src:ro" -v "$(dirname "$3"):/out" alpine \
@@ -74,6 +85,7 @@ backup_nginx() {
 
 backup_nextcloud() {
     local d="$1"
+    require_running nextcloud-onlyoffice nextcloud_db
     log "Backing up Nextcloud database"
     dc nextcloud-onlyoffice exec -T nextcloud_db \
         sh -c 'exec mariadb-dump --all-databases -uroot -p"$MYSQL_ROOT_PASSWORD"' > "$d/nextcloud_db.sql"
@@ -84,6 +96,7 @@ backup_nextcloud() {
 
 backup_onlyoffice() {
     local d="$1"
+    require_running nextcloud-onlyoffice onlyoffice_db
     log "Backing up OnlyOffice database"
     dc nextcloud-onlyoffice exec -T onlyoffice_db \
         sh -c 'exec pg_dumpall -U "$POSTGRES_USER"' > "$d/onlyoffice_db.sql"
@@ -92,6 +105,7 @@ backup_onlyoffice() {
 
 backup_synapse() {
     local d="$1"
+    require_running synapse synapse_db
     log "Backing up Synapse database"
     dc synapse exec -T synapse_db \
         sh -c 'exec pg_dumpall -U "$POSTGRES_USER"' > "$d/synapse_db.sql"
@@ -162,6 +176,7 @@ SERVICES=(nginx nextcloud onlyoffice synapse vaultwarden)
 
 run() {
     local action="$1" dir="$2" target="${3:-all}"
+    preflight
     if [[ "$target" == all ]]; then
         for s in "${SERVICES[@]}"; do "${action}_$s" "$dir"; done
     elif [[ " ${SERVICES[*]} " == *" $target "* ]]; then
