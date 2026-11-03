@@ -62,10 +62,35 @@ docker run -it --rm -v ./data:/data \
 ```sh
 scripts/backup_restore.sh backup            # everything
 scripts/backup_restore.sh backup synapse    # one service
-scripts/backup_restore.sh restore 202611031200 nextcloud
+scripts/backup_restore.sh restore 20261103120000 nextcloud
 ```
 
-Backups go to `backup/<timestamp>/` and the log to `logs/`.
+Targets: `all` (default), `nginx`, `nextcloud`, `onlyoffice`, `synapse`, `vaultwarden`.
+
+Backups go to `backup/<timestamp>/` and the log to `logs/`. Both are readable only
+by you, because they hold database dumps, signing keys and `config.php`.
+
+**How a backup behaves**
+
+- The stacks must be running. The script stops with a clear error otherwise.
+- A backup is written to `<timestamp>.partial` and renamed only when every step
+  succeeded, so a failed run never looks complete. A `.partial` folder can be deleted.
+- Every dump and archive is checked, and `SHA256SUMS` is written. Restore verifies it
+  first and refuses a damaged backup.
+- Nextcloud is put in maintenance mode while it is backed up, and Vaultwarden is
+  stopped for a few seconds, so their data is consistent. Both are brought back
+  even if the script fails.
+- Set `KEEP_BACKUPS=N` to keep only the newest N backups (default: keep all).
+  `BACKUP_DIR`, `LOG_DIR` and `ALPINE_IMAGE` can be overridden the same way.
+
+**How a restore behaves**
+
+- Data folders are replaced, not merged, so files created after the backup are removed.
+- Databases are restored in a single transaction and the script stops at the first
+  error, leaving the database unchanged.
+- Restoring `nginx` restarts the proxy, so your sites are briefly unavailable.
+
+Test a restore on a spare host before you rely on it.
 
 ## Upgrading
 
