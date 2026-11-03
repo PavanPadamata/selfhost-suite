@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  synapse:
+    image: matrixdotorg/synapse:latest
+    restart: unless-stopped
+    ports:
+      - "${SYNAPSE_CLIENT_PORT}:8008"
+      - "${SYNAPSE_FEDERATION_PORT}:8448"
+    depends_on:
+      - synapse_db
+    volumes:
+      - ./data:/data
+    environment:
+      - SYNAPSE_SERVER_NAME=${SYNAPSE_SERVER_NAME}
+      - SYNAPSE_REPORT_STATS=${SYNAPSE_REPORT_STATS}
+    networks:
+      - synapse_network
+      - nginx_network
+
+  synapse_db:
+    image: postgres:12-alpine
+    restart: unless-stopped
+    volumes:
+      - ./synapse_db_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=${POSTGRES_INITDB_ARGS}
+    networks:
+      - synapse_network
+
+networks:
+  nginx_network:
+    external: true
+  synapse_network:
