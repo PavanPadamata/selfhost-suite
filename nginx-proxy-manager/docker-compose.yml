@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  proxy:
+    image: jc21/nginx-proxy-manager:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"     # Public HTTP
+      - "443:443"   # Public HTTPS
+      - "81:81"     # Admin UI
+    environment:
+      DISABLE_IPV6: 'true'
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
+    networks:
+      - nginx_network
+
+networks:
+  nginx_network:
+    external: true  # Shared with every other stack, create it once: docker network create nginx_network
