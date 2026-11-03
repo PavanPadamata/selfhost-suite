@@ -1,0 +1,47 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "dependencyDashboard": true,
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 5,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Image versions kept in .env.example, marked with a renovate comment above the line",
+      "managerFilePatterns": ["/(^|/)\\.env\\.example$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)\\n[A-Z_]+=(?<currentValue>\\S+)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Default helper image of the backup script",
+      "managerFilePatterns": ["/^scripts/backup_restore\\.sh$/"],
+      "matchStrings": [
+        "ALPINE_IMAGE:-(?<depName>[a-z0-9./_-]+):(?<currentValue>[A-Za-z0-9._-]+)\\}"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "The Penpot images are released together",
+      "matchPackageNames": ["penpotapp/frontend", "penpotapp/backend", "penpotapp/exporter"],
+      "groupName": "penpot"
+    },
+    {
+      "description": "Major upgrades of these change the on-disk data format and cannot be applied in place",
+      "matchPackageNames": ["postgres", "mariadb", "nextcloud"],
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["manual-migration"],
+      "prBodyNotes": [
+        "**Major version.** An existing data directory cannot be upgraded by just changing the tag. Run `scripts/backup_restore.sh backup` first and follow the upstream upgrade notes, one major version at a time."
+      ]
+    },
+    {
+      "description": "Never jump several Nextcloud majors in one PR",
+      "matchPackageNames": ["nextcloud"],
+      "separateMultipleMajor": true
+    }
+  ]
+}
