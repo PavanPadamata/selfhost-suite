@@ -51,6 +51,17 @@ require_running() {
         || die "Service '$2' is not running in $1, start the stack first"
 }
 
+# wait_for <stack-dir> <service> <command run inside the container until it succeeds>
+wait_for() {
+    local stack="$1" service="$2" check="$3" tries=0
+    log "Waiting for $service to be ready"
+    until dc "$stack" exec -T "$service" sh -c "$check" >/dev/null 2>&1; do
+        tries=$((tries + 1))
+        [[ $tries -le 60 ]] || die "Timed out waiting for $service in $stack"
+        sleep 2
+    done
+}
+
 # tar_dir <stack-dir> <dir-name> <archive>  (runs in a container so file ownership is preserved)
 tar_dir() {
     docker run --rm -e OWNER="$(id -u):$(id -g)" -v "$ROOT/$1:/src:ro" -v "$(dirname "$3"):/out" "$ALPINE_IMAGE" \
@@ -140,7 +151,7 @@ restore_nextcloud() {
     dc nextcloud-onlyoffice stop nextcloud_app
     untar_dir nextcloud-onlyoffice "$d/nextcloud_data.tar.gz"
     dc nextcloud-onlyoffice up -d nextcloud_db
-    sleep 15
+    wait_for nextcloud-onlyoffice nextcloud_db 'mariadb-admin ping -uroot -p"$MYSQL_ROOT_PASSWORD"'
     dc nextcloud-onlyoffice exec -T nextcloud_db \
         sh -c 'exec mariadb -uroot -p"$MYSQL_ROOT_PASSWORD"' < "$d/nextcloud_db.sql"
     dc nextcloud-onlyoffice up -d nextcloud_app
@@ -150,7 +161,7 @@ restore_onlyoffice() {
     local d="$1"
     log "Restoring OnlyOffice database"
     dc nextcloud-onlyoffice up -d onlyoffice_db
-    sleep 10
+    wait_for nextcloud-onlyoffice onlyoffice_db 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
     # The role and database already exist on a fresh container, so those errors are expected.
     dc nextcloud-onlyoffice exec -T onlyoffice_db \
         sh -c 'exec psql -U "$POSTGRES_USER" -d postgres' < "$d/onlyoffice_db.sql" || true
@@ -163,7 +174,7 @@ restore_synapse() {
     dc synapse stop synapse
     untar_dir synapse "$d/synapse_data.tar.gz"
     dc synapse up -d synapse_db
-    sleep 10
+    wait_for synapse synapse_db 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
     dc synapse exec -T synapse_db \
         sh -c 'exec psql -U "$POSTGRES_USER" -d postgres' < "$d/synapse_db.sql" || true
     dc synapse up -d synapse
