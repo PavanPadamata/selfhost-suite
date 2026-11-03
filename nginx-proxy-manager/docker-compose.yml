@@ -8,6 +8,7 @@ services:
       - "80:80"     # Public HTTP
       - "443:443"   # Public HTTPS
       - "81:81"     # Admin UI
+      - "8448:8448" # Matrix federation
     environment:
       DISABLE_IPV6: 'true'
     volumes:
