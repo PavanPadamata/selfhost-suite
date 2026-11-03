@@ -155,8 +155,8 @@ backup_onlyoffice() {
     require_running nextcloud-onlyoffice onlyoffice_db
     log "Backing up OnlyOffice database"
     dc nextcloud-onlyoffice exec -T onlyoffice_db \
-        sh -c 'exec pg_dumpall -U "$POSTGRES_USER"' > "$d/onlyoffice_db.sql"
-    check_dump "$d/onlyoffice_db.sql" "PostgreSQL database cluster dump complete"
+        sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' > "$d/onlyoffice_db.sql"
+    check_dump "$d/onlyoffice_db.sql" "PostgreSQL database dump complete"
 }
 
 backup_synapse() {
@@ -164,8 +164,8 @@ backup_synapse() {
     require_running synapse synapse_db
     log "Backing up Synapse database"
     dc synapse exec -T synapse_db \
-        sh -c 'exec pg_dumpall -U "$POSTGRES_USER"' > "$d/synapse_db.sql"
-    check_dump "$d/synapse_db.sql" "PostgreSQL database cluster dump complete"
+        sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' > "$d/synapse_db.sql"
+    check_dump "$d/synapse_db.sql" "PostgreSQL database dump complete"
     log "Backing up Synapse config, media and signing key"
     tar_dir synapse data "$d/synapse_data.tar.gz"
 }
@@ -219,12 +219,16 @@ restore_nextcloud() {
 restore_onlyoffice() {
     local d="$1"
     log "Restoring OnlyOffice database"
+    # The server holds connections to the database, which would block the DROPs below.
+    dc nextcloud-onlyoffice stop onlyoffice
     dc nextcloud-onlyoffice up -d onlyoffice_db
     wait_for nextcloud-onlyoffice onlyoffice_db 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
-    # The role and database already exist on a fresh container, so those errors are expected.
+    # The dump drops and recreates every table, and runs as one transaction that
+    # stops at the first error, so a failed restore changes nothing.
     dc nextcloud-onlyoffice exec -T onlyoffice_db \
-        sh -c 'exec psql -U "$POSTGRES_USER" -d postgres' < "$d/onlyoffice_db.sql" || true
-    dc nextcloud-onlyoffice restart onlyoffice
+        sh -c 'exec psql -v ON_ERROR_STOP=1 --single-transaction -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+        < "$d/onlyoffice_db.sql" >/dev/null
+    dc nextcloud-onlyoffice up -d onlyoffice
 }
 
 restore_synapse() {
@@ -234,8 +238,11 @@ restore_synapse() {
     untar_dir synapse "$d/synapse_data.tar.gz" data
     dc synapse up -d synapse_db
     wait_for synapse synapse_db 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+    # The dump drops and recreates every table, and runs as one transaction that
+    # stops at the first error, so a failed restore changes nothing.
     dc synapse exec -T synapse_db \
-        sh -c 'exec psql -U "$POSTGRES_USER" -d postgres' < "$d/synapse_db.sql" || true
+        sh -c 'exec psql -v ON_ERROR_STOP=1 --single-transaction -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+        < "$d/synapse_db.sql" >/dev/null
     dc synapse up -d synapse
 }
 
