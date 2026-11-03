@@ -1,0 +1,14 @@
+# Local configuration and secrets
+.env
+*.key
+
+# Runtime data created by the stacks
+**/data/
+*_data/
+bitwarden/
+letsencrypt/
+penpot_assets/
+
+# Backups and logs written by scripts/backup_restore.sh
+backup/
+logs/
