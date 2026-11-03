@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# The single-quoted `sh -c '...'` commands below are meant to be expanded by the
+# shell inside the container (where the database credentials live), not here.
+# shellcheck disable=SC2016
 # Backup and restore helper for the stacks in this repository.
 #
 #   scripts/backup_restore.sh backup  [all|nginx|nextcloud|onlyoffice|synapse|vaultwarden]
