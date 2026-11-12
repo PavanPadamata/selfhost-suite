@@ -3,7 +3,7 @@ networks:
 
 services:
   penpot-frontend:
-    image: "penpotapp/frontend:2.18.5"
+    image: "penpotapp/frontend:2.19.1"
     restart: unless-stopped
     ports:
       - "${PENPOT_PORT}:80"
@@ -18,7 +18,7 @@ services:
       - PENPOT_FLAGS=enable-registration enable-login-with-password
 
   penpot-backend:
-    image: "penpotapp/backend:2.18.5"
+    image: "penpotapp/backend:2.19.1"
     restart: unless-stopped
     volumes:
       - ./penpot_assets:/opt/data/assets
@@ -46,7 +46,7 @@ services:
       - PENPOT_SMTP_SSL=false
 
   penpot-exporter:
-    image: "penpotapp/exporter:2.18.5"
+    image: "penpotapp/exporter:2.19.1"
     restart: unless-stopped
     networks:
       - penpot
