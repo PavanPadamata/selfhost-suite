@@ -30,6 +30,12 @@
       "groupName": "penpot"
     },
     {
+      "description": "Nextcloud documents MariaDB up to 11.8 as supported, so stay on 11.x until that changes",
+      "matchPackageNames": ["mariadb"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
       "description": "Major upgrades of these change the on-disk data format and cannot be applied in place",
       "matchPackageNames": ["postgres", "mariadb", "nextcloud"],
       "matchUpdateTypes": ["major"],
