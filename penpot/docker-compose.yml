@@ -55,7 +55,7 @@ services:
       - PENPOT_REDIS_URI=redis://penpot-redis/0
 
   penpot-postgres:
-    image: "postgres:17-alpine"
+    image: "postgres:18-alpine"
     restart: unless-stopped
     stop_signal: SIGINT
     volumes:
