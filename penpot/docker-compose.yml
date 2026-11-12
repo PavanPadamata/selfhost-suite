@@ -59,7 +59,7 @@ services:
     restart: unless-stopped
     stop_signal: SIGINT
     volumes:
-      - ./penpot_postgres_data:/var/lib/postgresql/data
+      - ./penpot_postgres_data:/var/lib/postgresql
     networks:
       - penpot
     environment:

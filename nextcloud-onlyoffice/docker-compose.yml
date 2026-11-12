@@ -69,7 +69,7 @@ services:
       - POSTGRES_USER=${ONLYOFFICE_DB_USER}
       - POSTGRES_PASSWORD=${ONLYOFFICE_DB_PASS}
     volumes:
-      - ${ONLYOFFICE_DB_VOLUME}:/var/lib/postgresql/data
+      - ${ONLYOFFICE_DB_VOLUME}:/var/lib/postgresql
     networks:
       - onlyoffice_network
 
