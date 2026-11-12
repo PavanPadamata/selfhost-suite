@@ -17,7 +17,7 @@ services:
       - nginx_network
 
   synapse_db:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     restart: unless-stopped
     volumes:
       - ./synapse_db_data:/var/lib/postgresql/data
