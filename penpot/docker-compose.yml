@@ -69,7 +69,7 @@ services:
       - POSTGRES_PASSWORD=${PENPOT_DB_PASSWORD}
 
   penpot-redis:
-    image: redis:8.10-alpine
+    image: redis:8.12-alpine
     restart: unless-stopped
     networks:
       - penpot
