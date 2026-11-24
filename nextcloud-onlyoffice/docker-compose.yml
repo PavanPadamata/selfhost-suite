@@ -36,7 +36,7 @@ services:
 
   # Cache and file locking for Nextcloud
   redis:
-    image: redis:8.10-alpine
+    image: redis:8.12-alpine
     container_name: ${REDIS_CONTAINER_NAME}
     restart: unless-stopped
     networks:
